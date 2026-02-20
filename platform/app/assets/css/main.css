@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme {
+  --color-pelley-50: oklch(0.98 0.005 350);
+  --color-pelley-100: oklch(0.95 0.01 350);
+  --color-pelley-200: oklch(0.90 0.015 350);
+  --color-pelley-300: oklch(0.82 0.02 348);
+  --color-pelley-400: oklch(0.72 0.025 348);
+  --color-pelley-500: oklch(0.60 0.025 346);
+  --color-pelley-600: oklch(0.50 0.023 346);
+  --color-pelley-700: oklch(0.40 0.02 345);
+  --color-pelley-800: oklch(0.30 0.018 345);
+  --color-pelley-900: oklch(0.22 0.015 344);
+  --color-pelley-950: oklch(0.15 0.012 344);
+}
+
+:root {
+  /* Backgrounds: warm white with very subtle pink tint */
+  --ui-bg: var(--color-pelley-50);
+  --ui-bg-muted: var(--color-pelley-100);
+  --ui-bg-elevated: oklch(1.0 0 0);
+  --ui-bg-accented: var(--color-pelley-100);
+  --ui-bg-inverted: oklch(0.205 0.015 340);
+
+  /* Borders: light gray with pink warmth */
+  --ui-border: var(--color-pelley-200);
+  --ui-border-muted: var(--color-pelley-100);
+  --ui-border-accented: var(--color-pelley-300);
+  --ui-border-inverted: oklch(0.205 0.015 340);
+
+  /* Text: warm neutrals */
+  --ui-text: var(--color-pelley-950);
+  --ui-text-muted: var(--color-pelley-500);
+  --ui-text-dimmed: var(--color-pelley-400);
+  --ui-text-toned: var(--color-pelley-600);
+  --ui-text-highlighted: var(--color-pelley-950);
+  --ui-text-inverted: var(--color-pelley-50);
+}
+
+.dark {
+  /* Backgrounds: dark with subtle pink warmth (not cold gray) */
+  --ui-bg: var(--color-pelley-950);
+  --ui-bg-muted: var(--color-pelley-900);
+  --ui-bg-elevated: var(--color-pelley-800);
+  --ui-bg-accented: var(--color-pelley-800);
+  --ui-bg-inverted: var(--color-pelley-50);
+
+  /* Borders: warm dark edges */
+  --ui-border: var(--color-pelley-700);
+  --ui-border-muted: var(--color-pelley-800);
+  --ui-border-accented: var(--color-pelley-700);
+  --ui-border-inverted: var(--color-pelley-50);
+
+  /* Text: warm light tones */
+  --ui-text: var(--color-pelley-50);
+  --ui-text-muted: var(--color-pelley-400);
+  --ui-text-dimmed: var(--color-pelley-500);
+  --ui-text-toned: var(--color-pelley-300);
+  --ui-text-highlighted: var(--color-pelley-50);
+  --ui-text-inverted: var(--color-pelley-950);
+}

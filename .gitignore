@@ -1,0 +1,34 @@
+# Backup files created by install.sh
+*.bak.*
+
+# OpenCode local overrides
+.opencode/opencode.local.json
+
+# Node dependencies (installed by opencode's bundled Bun at runtime)
+.opencode/node_modules/
+.opencode/bun.lock
+
+# Runtime state (created by hooks and skills, not distributable)
+memory/
+
+# Rust build artifacts
+tools/git-intel/target/
+
+# Python artifacts
+__pycache__/
+.venv/
+
+# Research repos (cloned for analysis, not committed)
+research/
+tools/repos/
+
+# Training data and model artifacts
+tools/data/
+
+# Internal tooling (ships separately via git-intel repo)
+tools/commit-labeler/
+tools/learnings-coverage/
+tools/difficulty-calibration/
+tools/knowledge-transfer/
+opencode.json
+.DS_Store

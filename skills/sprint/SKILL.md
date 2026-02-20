@@ -1,0 +1,294 @@
+---
+name: sprint
+description: "Plan and dispatch work to team members with the learning loop: assign tasks by ownership, spawn agents with injected learnings, parse reflections, and persist new learnings. Works with or without beads backlog tracking. Use when you have a team assembled and work to dispatch. Keywords: dispatch, execute, work, plan, assign, run, do, build."
+argument-hint: "[task filter or focus area]"
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash(bd:*), Bash(git:*), Bash(mkdir:*), Bash(tools/git-intel/target/release/git-intel:*)
+---
+
+# Sprint: Plan, Dispatch, Learn
+
+You are running a **Sprint** -- the core execution loop for a persistent learning team. Sprint assigns tasks to team members, dispatches them with accumulated learnings, parses their reflections, and persists new learnings. Over time, agents effectively improve because their learnings grow.
+
+**Focus area (optional):** $ARGUMENTS
+
+## When to Use
+
+- When you have a team assembled (via `/assemble`) and work to dispatch
+- When you want to dispatch work to team members with the learning loop
+- When agents should accumulate knowledge from each task to improve on the next
+- After a planning session (like `/blossom`) produces tasks to execute
+- When you want structured reflection and learning persistence after each task
+- Works with beads backlog (pulls from `bd ready`) or without (accepts manual task descriptions)
+
+## The Learning Loop
+
+```
+Load manifest + learnings + backlog
+  -> Auto-assign tasks to members by ownership
+    -> User approves assignments
+      -> Dispatch member as subagent (serialize)
+        -> Parse reflection
+          -> Update member's learnings.md
+            -> Dispatch next -> Sprint report
+```
+
+---
+
+## Phase 0: Session Health Gate
+
+Before loading context and dispatching agents, check that the session has enough capacity for the sprint.
+
+**Assess the current session inline:**
+- Roughly how many files have you read this session?
+- How many agents have you dispatched so far?
+- How many distinct codebase areas have you touched?
+
+| Load Level | Files Read | Agents Dispatched | Signal |
+|------------|-----------|-------------------|--------|
+| Light | <10 | 0-1 | Healthy -- proceed |
+| Moderate | 10-25 | 2-4 | Proceed, watch quality |
+| Heavy | 25-50 | 5+ | Warn user before dispatching |
+| Overloaded | 50+ | 8+ | Recommend handoff |
+
+**If load is Heavy or Overloaded:** Warn the user:
+
+> Session context is heavy (~X files read, ~Y agents dispatched). Dispatching additional agents in this session risks degraded quality -- agents may receive compressed or incomplete context. Recommend running `/handoff` to capture current state and starting a fresh session for the sprint. Continue anyway? (y/n)
+
+Wait for user confirmation before proceeding. If the user declines, stop here and run `/handoff`.
+
+**If load is Light or Moderate, or the user confirms they want to continue:** Proceed to Phase 1.
+
+---
+
+## Phase 1: Load Context
+
+### 1a. Read Team Manifest
+
+Read `team.yaml`. If it doesn't exist, tell the user to run `/assemble` first and stop.
+
+### 1b. Read All Learnings
+
+For each member, read `memory/agents/<name>/learnings.md`. Note the current size (line count) and most recent entries.
+
+### 1c. Load Epic State (conditional)
+
+Check for epic state files written by `/blossom`:
+
+```bash
+ls memory/epics/*/epic.md 2>/dev/null
+```
+
+If any epic state files exist, read them. These contain spike findings, priority order, task IDs, critical path, and parallel opportunities from a prior blossom run. When matching tasks to members in Phase 2, use the spike findings (confidence levels, file scopes, agent hints) and priority order from the epic state to inform assignments. If `$ARGUMENTS` names a specific epic, load only that epic's state file.
+
+### 1d. Load Backlog (conditional)
+
+**If `.beads/` exists in the project root**, check the backlog:
+
+```bash
+bd ready
+bd list --status=in_progress
+bd blocked
+```
+
+If a focus area was provided via `$ARGUMENTS`, filter to relevant beads.
+
+**If `.beads/` does not exist**, skip this step. The sprint will accept manual task descriptions from the user instead of pulling from the backlog.
+
+### 1e. Prerequisite Gate (STOP if incomplete)
+
+Do not proceed to Phase 2 until all context is loaded:
+- [ ] team.yaml was read (not just referenced -- Read tool returned its contents)
+- [ ] Every member's learnings.md was read
+- [ ] Epic state files checked (loaded if present)
+- [ ] Backlog state is known (bd ready output is in context, or user provided tasks)
+
+If any prerequisite is missing, go back and complete it now. Planning without loaded context produces wrong assignments.
+
+---
+
+## Phase 2: Plan Assignments
+
+### 2a. Match Tasks to Members
+
+**If beads are available**, for each ready bead, determine the best-fit member by:
+1. **Ownership match**: Does the bead's likely file scope overlap with a member's `owns` patterns?
+2. **Role match**: Does the bead's topic align with a member's role description?
+3. **Learning advantage**: Has a member accumulated relevant learnings for this type of task?
+
+**If beads are not available**, ask the user to describe the tasks they want dispatched, then match tasks to members based on role and ownership fit.
+
+### 2b. Present Sprint Plan
+
+```markdown
+## Sprint Plan
+
+| Bead | Title | Assigned To | Reason |
+|------|-------|-------------|--------|
+| [id] | [title] | [member] | [ownership match / role match / learning advantage] |
+| ... | ... | ... | ... |
+
+### Dispatch Order
+1. [bead-id]: [member] -- [brief reason for ordering]
+2. [bead-id]: [member] -- [brief reason]
+...
+
+**Strategy**: Serial dispatch (each task benefits from the previous one's learnings)
+```
+
+Ask the user to approve, reorder, reassign, or remove tasks.
+
+---
+
+## Phase 3: Dispatch
+
+For each approved assignment, in the approved order:
+
+### 3a. Compose the Prompt
+
+Build the task prompt following the spawn protocol from team-protocol.md:
+
+1. Read the member's current `learnings.md`
+2. **Compute the agent identity trailer**: Run `git log -1 --format=%h -- memory/agents/<name>/learnings.md` to get the short SHA of the last commit that modified this member's learnings. The trailer value is `<name>@<sha>`. If the learnings file has no git history (new member), use `git log -1 --format=%h` to get HEAD instead.
+3. Compose a prompt that includes: member identity (name, role, owns), learnings, task description, and reflection instructions
+4. Include any relevant context from previous dispatches in this sprint
+5. **Add commit trailer instruction**: Tell the agent that when making git commits, they must include this trailer on a new line after the commit message body:
+   ```
+   Agent: <computed-trailer-value>
+   ```
+   Make it clear the agent should use the LITERAL value provided in the prompt, not compute it themselves.
+
+#### Signal Enrichment (conditional)
+
+**If** `tools/git-intel/target/release/git-intel` exists:
+
+1. Run `tools/git-intel/target/release/git-intel patterns --repo . --since "30d"` and parse the JSON output
+2. Extract signals where `kind == "fix_after_refactor"` from the `signals` array
+3. For each fix_after_refactor signal, check if any of the signal's `files` match the member's `owns` glob patterns (from team.yaml)
+4. If there's overlap, add a signal warning section to the dispatch prompt:
+
+```markdown
+**Signal Warning**: Recent refactor-then-fix pattern detected on files you own:
+- [file path]: refactored in [first commit hash], then fixed in [second commit hash]. This area may need extra verification after changes.
+```
+
+**If** git-intel doesn't exist, skip this enrichment silently and proceed with the standard prompt composition
+
+### 3b. Execute
+
+Dispatch to an isolated subagent:
+
+```
+dispatch(agent="<member-name>", task="<composed prompt with identity, learnings, task, and reflection instructions>", taskId="<bead-id>")
+```
+
+Dispatch tasks serially so each agent benefits from the previous one's learnings.
+
+### 3c. Mark Bead In-Progress (conditional)
+
+**If beads are available**:
+
+```bash
+bd update <bead-id> --status=in_progress
+```
+
+**If beads are not available**, skip this step.
+
+---
+
+## Phase 4: Process Results
+
+After each dispatch returns:
+
+### 4a. Parse the Response
+
+Extract from the agent's output:
+- **task_result**: status, summary, files changed
+- **reflection**: what worked, what didn't, confidence level
+- **suggested_learnings**: new learnings to persist
+- **follow_up**: blockers, suggested next steps, human input needed
+
+If the agent returned unstructured text, extract these fields by interpreting the output. Look for patterns like "I completed...", "I struggled with...", "I learned that...".
+
+### 4b. Update Learnings
+
+For each suggested learning:
+
+1. **Validate**: Is this learning durable (useful across sessions) or ephemeral (only relevant now)?
+2. **Categorize**: Map to the correct section (Codebase Patterns, Gotchas, Preferences, Cross-Agent Notes)
+3. **Append**: Add to `memory/agents/<name>/learnings.md` with today's date and dispatch provenance
+4. **Route cross-agent**: If `for_agent` is specified, also add to that agent's learnings under "Cross-Agent Notes" prefixed with `(from <source-agent>)`
+
+When appending entries, include the `dispatch:` field to track task provenance:
+
+```markdown
+## Gotchas
+- TrustService requires bootstrap before first call (added: 2026-02-13, dispatch: bead-abc123)
+```
+
+The `dispatch:` field is optional but recommended. Use the bead ID if beads are available (e.g., `dispatch: bead-abc123`), or a brief identifier if not (e.g., `dispatch: sprint-manual`). Existing entries without dispatch provenance are backward-compatible and do not need updating.
+
+### 4c. Update Bead (conditional)
+
+**If beads are available**, based on `task_result.status`:
+- **completed**: `bd close <bead-id>`
+- **partial**: Keep in-progress, note what remains
+- **blocked**: `bd update <bead-id> --notes="Blocked: <blocked_by>"`
+- **failed**: `bd update <bead-id> --notes="Failed: <summary>"`
+
+**If beads are not available**, skip bead updates and simply note the task status in the sprint report.
+
+### 4d. Report Progress
+
+After each task, show a brief progress update:
+
+```markdown
+### [member]: [bead-title]
+**Status**: [status] | **Confidence**: [confidence]
+**Summary**: [1-2 sentences]
+**Learnings persisted**: [count] new entries
+**Next**: [dispatching next task / sprint complete / blocked]
+```
+
+### 4e. Dispatch Next
+
+If there are more tasks in the sprint, proceed to 3a for the next assignment. The next agent will benefit from any learnings just persisted.
+
+---
+
+## Phase 5: Sprint Report
+
+After all tasks are dispatched (or the sprint is stopped):
+
+```markdown
+## Sprint Report
+
+### Completed
+| Bead | Member | Status | Confidence | Learnings |
+|------|--------|--------|------------|-----------|
+| [id] | [name] | [status] | [confidence] | [count] new |
+| ... | ... | ... | ... | ... |
+
+### Learning Summary
+- **Total new learnings**: [count] across [members] members
+- **Cross-agent notes delivered**: [count]
+- **Notable learnings**: [2-3 most significant new learnings]
+
+### Blockers Encountered
+[List any blocked or failed tasks with their blockers. "None" if clean sprint.]
+
+### Suggested Next Sprint
+[Based on follow_up.suggested_next from all tasks, recommend what to tackle next.]
+```
+
+---
+
+## Guidelines
+
+1. **Serialize by default.** Dispatch one task at a time so each agent benefits from the previous one's learnings.
+2. **Learnings are the product.** A sprint that completes tasks but doesn't persist learnings has wasted half its value. Always update learnings files.
+3. **Validate learnings.** Don't blindly append everything an agent suggests. Filter out ephemeral observations and duplicates.
+4. **Date every entry.** Always add `(added: YYYY-MM-DD)` to new learnings for staleness tracking.
+5. **Watch for bloat.** If a learnings file exceeds 120 lines during a sprint, flag it for pruning in the next `/retro`.
+6. **Context carries forward.** When dispatching the second+ task in a sprint, include a brief summary of what previous agents found/changed.
+
+See also: /review (structured code review after agent implementation), /retro (capture sprint learnings at session end).

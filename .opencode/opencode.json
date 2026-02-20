@@ -1,0 +1,91 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-5",
+  "small_model": "anthropic/claude-haiku-4-5",
+  "instructions": [
+    "file://rules/*.md",
+    "file://.opencode/opencode.md"
+  ],
+  "mcp": {
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@executeautomation/playwright-mcp-server"
+      ],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "enabled": true
+    },
+    "context7": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@upstash/context7-mcp@2.1.1"
+      ],
+      "enabled": true
+    },
+    "memory": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "enabled": true
+    }
+  },
+  "default_agent": "code-reviewer",
+  "plugin": [
+    "./plugins/pelley-hooks.ts",
+    "./plugins/telemetry.ts",
+    "./tools/skill.ts"
+  ],
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 10000
+  },
+  "agent": {
+    "code-reviewer": {
+      "description": "Read-only code review agent. Analyzes code quality, patterns, and potential issues without making changes.",
+      "model": "anthropic/claude-sonnet-4-5",
+      "tools": {
+        "write": false,
+        "edit": false
+      }
+    }
+  },
+  "permission": {
+    "bash": "ask",
+    "edit": "allow",
+    "write": "allow"
+  },
+  "provider": {
+    "local-server": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local Server",
+      "options": {
+        "baseURL": "http://10.0.0.194:8080/v1"
+      },
+      "models": {
+        "unsloth/Qwen3.5-35B-A3B-GGUF:Q5_K_M": {
+          "name": "unsloth/Qwen3.5-35B-A3B-GGUF:Q5_K_M",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          }
+        }
+      }
+    }
+  }
+}
